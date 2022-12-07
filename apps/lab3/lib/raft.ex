@@ -262,11 +262,12 @@ defmodule Dynamo do
     state = %{state| key_range_data: new_map}
   end
 
-  def mark_process_alive(state,keyList) do
-    if keyList == [] do
+  # For each process in the list, mark it as alive in the state
+  def mark_process_alive(state,procList) do
+    if procList == [] do
       state
     else
-      [head|tail] = keyList
+      [head|tail] = procList
       new_view = Map.put(state.view,head,{true,Emulation.emu_to_millis(Emulation.now())})
       state = %{state|view: new_view}
       state = mark_process_alive(state,tail)
@@ -299,8 +300,8 @@ defmodule Dynamo do
     if list_of_node == [] do
       first_view
     else
-      [head|tail] = list_of_node
-      {first_view_is_alive,first_view_time} = first_view[head]
+      [head|tail] = list_of_node  # list of nodes ; [:a, :b, :c] etc
+      {first_view_is_alive,first_view_time} = first_view[head]  # {true,<time>} = map[head] ==> Get the alive status, time of the node head from view
       {second_view_is_alive,second_view_time} = second_view[head]
       if first_view_time < second_view_time do
         new_tup = {second_view_is_alive,second_view_time}
@@ -328,6 +329,7 @@ defmodule Dynamo do
     end
   end
 
+  # A node starts with initial count set to the configurable W param
   def handle_write_request(state,count,request) do
     {sender,key,value,context,keyList} = request
     if count == 0 do
@@ -359,63 +361,70 @@ defmodule Dynamo do
         # Reconcile the views
         {_,{:gossip_view,other_view}} ->
             Emulation.cancel_timer(state.gossip_timer)
+            # Reconcile self view from the rceived view
             reconciled_view = reconcile_views(state.view,other_view,state.node_list)
             state = %{state| view: reconciled_view}
+
+            # mark failed processes from the new view
             state = reconcile_all_failed_process(state,state.node_list)
             t = Emulation.timer(state.gossip_timeout,:gossip_timer)
             state = %{state| gossip_timer: t}
             handle_write_request(state,count,request)
 
+        {_,:get_state} -> 
+          IO.puts("State of #{inspect(whoami())} : #{inspect(state)}")
+          handle_write_request(state,count,request)
 
-
-
-        {_,:get_state} -> IO.puts("State of #{inspect(whoami())} : #{inspect(state)}")
-            handle_write_request(state,count,request)
         {_,{:stop,proc_name}} -> 
           if proc_name == whoami() do
-            #IO.puts("#{inspect(whoami())} Dies Now :-(")
+            IO.puts("#{inspect(whoami())} Dies Now :-(")
+            # pass
           else
               state = mark_process_dead(state,proc_name)
               handle_write_request(state,count,request)
           end
 
 
+      # Receives put request
       {sender, %Message.PutRequest{
         key: key,
         value: value,
         context: context
-        }} -> if eligible_put_request(state,{key,value,context}) do
-              state = write_to_state(state,{key,value,context})
-              state = mark_process_alive(state,[sender])
-              message = %Message.PutResponse{
-                key: key,
-                context: context,
-                success: true
-              }
-              send(sender,message)
-              handle_write_request(state,count,request)
-              else
-                message = %Message.PutResponse{
-                  key: key,
-                  context: context,
-                  success: false
-                }
-                send(sender,message)
-                handle_write_request(state,count,request)
-              end
+        }} -> 
+          # If is a valid put request, update they key-value store and send a success message to the client
+          if isValidPutRequest(state,{key,value,context}) do
+            state = put(state,{key,value,context})      # put request in map
+            state = mark_process_alive(state,[sender])  # mark the sender as alive in view
+            message = %Message.PutResponse{
+              key: key,
+              context: context,
+              success: true
+            }
+            send(sender,message)
+            handle_write_request(state,count,request)
+          else  # else send false message to the sender
+            message = %Message.PutResponse{
+              key: key,
+              context: context,
+              success: false
+            }
+            send(sender,message)
+            handle_write_request(state,count,request)
+          end
               
-
-
       {sender, %Message.PutResponse{
         key: key,
         context: context,
         success: success
       }} -> 
           state = mark_process_alive(state,[sender])
+
+          # success, decrement count by 1. If this equals to 0 then we have received W number of responses then we can return :ok to client
+          # SEE line 334
           if success == true do
             handle_write_request(state,count - 1,request)
           else
-            handle_write_request(state, count,request)
+            handle_write_request(state,count,request)
           end
       
 
@@ -451,7 +460,6 @@ defmodule Dynamo do
       }} -> 
         state = mark_process_alive(state,[sender])
         handle_write_request(state, count,request)
-      
       end
     end
   end
