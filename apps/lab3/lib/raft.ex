@@ -432,7 +432,7 @@ defmodule Dynamo do
         key: key
       }} ->
         state = mark_process_alive(state,[sender])
-        if state.hash_map[key] == nil do
+        if state.key_value_map[key] == nil do
           message = %Message.GetResponse{
             key: key,
             value: nil,
@@ -441,7 +441,7 @@ defmodule Dynamo do
           send(sender,message)
           handle_write_request(state, count,request)
         else 
-          {:ok,{val,cont}} = Map.fetch(state.hash_map,key)
+          {:ok,{val,cont}} = Map.fetch(state.key_value_map,key)
           message = %Message.GetResponse{
             key: key,
             value: val,
@@ -463,6 +463,397 @@ defmodule Dynamo do
       end
     end
   end
+
+  # Receive a write request
+  # Write the key value map to self if this node is the owner of the key and broadcast to other nodes
+  # else ignore
+  def transition_to_write_mode(state,request) do
+    #Read the Request
+    {sender,key,value,context,keyList} = request
+    message = %Message.PutRequest{
+      key: key,
+      value: value,
+      context: context
+    }
+    if isValidPutRequest(state,{key,value,context}) do
+      # broadcast the request to all other nodes
+      broadcast_request_to_others(state,message,keyList)
+      # Write in self state's key-value map
+      new_hash_map = Map.put(state.key_value_map,key,{value,context})
+      state = %{state| key_value_map: new_hash_map}
+      handle_write_request(state,state.w - 1,request)
+    else
+      listen_client_request(state)
+    end
+  end
+
+  def handle_read_request(state,request,response,read_count) do
+    # if read_count becomes 0, it means this node has received the quorum R and now can send the response back to the client
+    if read_count == 0 do
+      #Prepare Response and send it
+      {sender,key,keyList} = request
+      #IO.puts("Sending the Response : #{inspect(response)}")
+      send(sender,response)
+      listen_client_request(state)
+    else
+      receive do
+        # gossip timer hit
+        :gossip_timer -> 
+          proc_name = get_random_process(state) 
+          message = {:gossip_view}
+          send(proc_name,message)
+          Emulation.cancel_timer(state.gossip_timer)
+          t = Emulation.timer(state.gossip_timeout,:gossip_timer)
+          state = %{state| gossip_timer: t}
+          handle_read_request(state,request,response,read_count)
+        
+        # received a gossip view message. Send back state.view
+        {sender,{:gossip_view}} ->   
+          message = {:gossip_view,state.view}
+          send(sender,message)
+          handle_read_request(state,request,response,read_count)
+
+        # receive response for gossip view message. Reconcile views
+        {_,{:gossip_view,other_view}} ->
+            Emulation.cancel_timer(state.gossip_timer)
+            reconciled_view = reconcile_views(state.view,other_view,state.node_list)
+            state = %{state| view: reconciled_view}
+            state = reconcile_all_failed_process(state,state.node_list)
+            t = Emulation.timer(state.gossip_timeout,:gossip_timer)
+            state = %{state| gossip_timer: t}
+            handle_read_request(state,request,response,read_count)
+
+        {_,:get_state} -> 
+          IO.puts("State of #{inspect(whoami())} : #{inspect(state)}")
+          handle_read_request(state,request,response,read_count)
+
+        {_,{:stop,proc_name}} -> 
+          if proc_name == whoami() do
+            IO.puts("#{inspect(whoami())} fails/stopped")
+          else
+              state = mark_process_dead(state,proc_name)
+              handle_read_request(state,request,response,read_count)
+          end
+
+
+        {sender, %Message.PutRequest{
+          key: key,
+          value: value,
+          context: context
+         }} ->
+          if isValidPutRequest(state,{key,value,context}) do
+            state = put(state,{key,value,context})
+            state = mark_process_alive(state,[sender])
+            message = %Message.PutResponse{
+              key: key,
+              context: context,
+              success: true
+            }
+            send(sender,message)
+            handle_read_request(state,request,response,read_count)
+          else
+            message = %Message.PutResponse{
+              key: key,
+              context: context,
+              success: false
+            }
+            send(sender,message)
+            handle_read_request(state,request,response,read_count)
+          end
+        
+        {sender, %Message.PutResponse{
+          key: key,
+          context: context
+        }} -> 
+          state = mark_process_alive(state,[sender])  
+          handle_read_request(state,request,response,read_count)
+
+        {sender, %Message.GetRequest{
+          key: key
+        }} ->  
+          state = mark_process_alive(state,[sender])
+          if state.key_value_map[key] == nil do
+            message = %Message.GetResponse{
+              key: key,
+              value: nil,
+              context: nil
+            }
+            send(sender,message)
+            handle_read_request(state,request,response,read_count)
+          else 
+            {:ok,{val,cont}} = Map.fetch(state.key_value_map,key)
+            message = %Message.GetResponse{
+              key: key,
+              value: val,
+              context: cont
+            }
+            send(sender,message)
+            handle_read_request(state,request,response,read_count)
+        end 
+
+        {sender, %Message.GetResponse{
+          key: key,
+          value: value,
+          context: context
+          }} -> 
+            state = mark_process_alive(state,[sender])
+            if value == nil do
+              handle_read_request(state,request,response,read_count - 1)
+            else
+              {response_value,response_context} = response
+              if response_context < context do
+                response = {value,context}
+                handle_read_request(state,request,response,read_count - 1)
+              else
+                handle_read_request(state,request,response,read_count - 1)
+              end
+
+            end
+      end
+    end 
+  end
+
+  def transition_to_read_mode(state,request) do
+    {sender,key,keyList} = request
+    message = %Message.GetRequest{
+      key: key
+    }
+    broadcast_request_to_others(state,message,keyList)
+    if state.key_value_map[key] == nil do
+      response = {nil,nil}
+      handle_read_request(state,request,response,state.r - 1)
+    else
+      {:ok,response} = Map.fetch(state.hash_map,key)
+      handle_read_request(state,request,response,state.r - 1)
+    end
+  end
+
+  def listen_client_request(state) do
+    receive do
+      :gossip_timer -> 
+        proc_name = get_random_process(state) 
+        message = {:gossip_view}
+        send(proc_name,message)
+        t = Emulation.timer(state.gossip_timeout,:gossip_timer)
+        state = %{state| gossip_timer: t}
+        listen_client_request(state)
+                        
+        
+        {sender,{:gossip_view}} ->   
+          message = {:gossip_view,state.view}
+          send(sender,message)
+          listen_client_request(state)
+
+        {_,{:gossip_view,other_view}} ->
+          Emulation.cancel_timer(state.gossip_timer)
+          reconciled_view = reconcile_views(state.view,other_view,state.node_list)
+          if whoami() == :f do
+            IO.puts("Reconciled View of F : #{inspect(reconciled_view)}")
+          end
+          state = %{state| view: reconciled_view}
+          state = reconcile_all_failed_process(state,state.node_list)
+          t = Emulation.timer(state.gossip_timeout,:gossip_timer)
+          state = %{state| gossip_timer: t}
+          listen_client_request(state)
+
+          
+      {_,:get_state} -> IO.puts("State of #{inspect(whoami())} : #{inspect(state)}")
+        listen_client_request(state)
+
+      {_,{:stop,proc_name}} -> 
+        #IO.puts("Stop Message here : #{inspect(proc_name)}")
+        if proc_name == whoami() do
+            #IO.puts("#{inspect(whoami())} Dies Now :-(")
+        else
+          #will see what to do
+          state = mark_process_dead(state,proc_name)  
+          listen_client_request(state)
+        end
+
+      {sender, {:put, key, value, context}} ->
+        #We need a function for Redirection.
+        keyList = get_first_N_nodes_from_preference_list(key,state)
+        node_eligible = checkIfEligibleNode(keyList,whoami())
+        if node_eligible == true do
+          request = {sender,key,value,context,keyList}
+          transition_to_write_mode(state,request)
+        else
+          [head|tail] = keyList
+          message = {:redirect,head}
+          send(sender,message)
+          #IO.puts("Message: #{inspect(message)}")
+          listen_client_request(state)
+        end
+
+
+      {sender, {:get, key}} ->
+        #IO.puts("Got Get Request From Client State of Node: #{inspect(state)}")
+        keyList = get_first_N_nodes_from_preference_list(key,state)
+        #IO.puts("Returns from here")
+        node_eligible = checkIfEligibleNode(keyList,whoami())
+        if node_eligible == true do
+          # A Get Request from the Client
+          # Lets go to ReadMode and Listen to ReadRequests.
+          # Once we get R responses we will construct the response and will transfer it to the Client.
+          # We will return the Client the Value with the Highest Context Value.
+          request = {sender,key,keyList}
+          #IO.puts("Inspecting Request : #{inspect(request)}")
+          transition_to_read_mode(state,request)
+        else
+          #We are not the eligible one.
+          #Just return a Redirection Response to the Client so that it can contact the Correct Node
+          [head|tail] = keyList
+          message = {:redirect,head}
+          send(sender,message)
+          listen_client_request(state)
+        end
+
+
+      #Time For Response from Other Nodes :
+       {sender, %Message.PutRequest{
+        key: key,
+        value: value,
+        context: context
+       }} ->
+        #What to do if other Nodes have more updated Version of the PutRequest
+        #IO.puts("#{inspect(whoami())} recieved an request for key : #{inspect(key)}")
+        if isValidPutRequest(state,{key,value,context}) do
+          state = put(state,{key,value,context})
+          state = mark_process_alive(state,[sender])
+          message = %Message.PutResponse{
+            key: key,
+            context: context,
+            success: true
+          }
+          send(sender,message)
+          listen_client_request(state)
+        else
+          message = %Message.PutResponse{
+            key: key,
+            context: context,
+            success: false
+          }
+          send(sender,message)
+          listen_client_request(state)
+        end
+        
+
+       {sender, %Message.PutResponse{
+        key: key,
+        context: context
+       }} -> 
+        #This put is already done.
+        #No need to count or anything else
+        state = mark_process_alive(state,[sender])  
+        listen_client_request(state)
+
+       {sender, %Message.GetRequest{
+        key: key
+       }} ->
+        state = mark_process_alive(state,[sender])
+        if state.key_value_map[key] == nil do
+          message = %Message.GetResponse{
+            key: key,
+            value: nil,
+            context: nil
+          }
+          send(sender,message)
+          listen_client_request(state)
+        else 
+          {:ok,{val,cont}} = Map.fetch(state.hash_map,key)
+          message = %Message.GetResponse{
+            key: key,
+            value: val,
+            context: cont
+          }
+          send(sender,message)
+          listen_client_request(state)
+        end 
+        
+
+       {sender, %Message.GetResponse{
+        key: key,
+        value: value,
+        context: context
+       }} -> 
+        #Got some response 
+        state = mark_process_alive(state,[sender])
+        listen_client_request(state)
+
+      msg -> #Any Error Messages  :
+          IO.puts("Recieved unknown message #{inspect{msg}}")
+
+    end
+  end
+
+end
+
+defmodule Dynamo.Client do
+    import Emulation, only: [send: 2]
+
+    import Kernel,
+    except: [spawn: 3, spawn: 1, spawn_link: 1, spawn_link: 3, send: 2]
+
+    alias __MODULE__
+    @enforce_keys [:node]
+    defstruct(node: nil)
+
+    @spec new_client(atom()) :: %Client{node: atom()}
+    def new_client(member) do
+      %Client{node: member}
+    end
+
+    @spec put(%Client{}, atom(), atom(), any()) :: {:ok, %Client{}}
+    def put(client, key, value, context) do
+      other_node = client.node
+      message = {:put, key, value, context}
+      send(other_node, message)
+      receive do
+        {_, {:redirect, other_node}} ->
+          put(%{client | node: other_node}, key, value, context)
+
+        {_, :ok} ->
+          IO.puts("Client Recieved success for put request.")
+          {:ok, client}
+
+        errMsg -> IO.puts("Client Recieved unknown message #{inspect{errMsg}}")
+
+      end
+    end
+
+    @spec get(%Client{}, atom()) :: {:ok, %Client{}}
+    def get(client, key) do
+      other_node = client.node
+      message = {:get, key}
+      send(other_node, message)
+      receive do
+        {_, {:redirect, other_node}} ->
+            get(%{client| node: other_node}, key)
+
+        {_, {value, staleness}} -> 
+          {{value, staleness}, client}
+
+
+      end
+    end
+
+    @spec update_node(%Client{}, atom()) :: {:ok, atom()}
+    def update_node(client, new_node) do
+      #The Client will update the Contacted Node :
+      #Will be useful for testing when the Node Fails
+      client = %{client|node: new_node}
+      client
+    end
+
+    @spec stop_process(%Client{},atom()) :: :no_return
+    def stop_process(client,proc_name) do
+      other_node = client.node
+      message = {:stop,proc_name}
+      IO.puts("Name of Failed  Process : #{inspect(message)}")
+      send(proc_name,message)
+      send(other_node,message)
+    end
+
 
 end
 
