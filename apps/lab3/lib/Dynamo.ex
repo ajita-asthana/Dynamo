@@ -79,14 +79,18 @@ defmodule Dynamo do
   end
 
   def isValidRange(keyRange,key) do
+    IO.puts("\nkeyrange: ")
+    IO.inspect(keyRange)
+    IO.inspect(key)
     if keyRange==[] do
       false
-    end
-    [head|tail] = keyRange
-    if isKeyInRange(head,key) == true do
-      true
     else
-      isValidRange(tail,key)
+      [head|tail] = keyRange
+      if isKeyInRange(head,key) == true do
+        true
+      else
+        isValidRange(tail,key)
+      end
     end
   end
 
@@ -623,7 +627,7 @@ defmodule Dynamo do
       response = {nil,nil}
       handle_read_request(state,request,response,state.r - 1)
     else
-      {:ok,response} = Map.fetch(state.hash_map,key)
+      {:ok,response} = Map.fetch(state.key_value_map,key)
       handle_read_request(state,request,response,state.r - 1)
     end
   end
@@ -760,7 +764,7 @@ defmodule Dynamo do
           send(sender,message)
           listen_client_request(state)
         else 
-          {:ok,{val,cont}} = Map.fetch(state.hash_map,key)
+          {:ok,{val,cont}} = Map.fetch(state.key_value_map,key)
           message = %Message.GetResponse{
             key: key,
             value: val,
