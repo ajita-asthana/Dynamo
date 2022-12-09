@@ -763,6 +763,8 @@ defmodule Dynamo do
       {sender, {:put, key, value, context}} ->
         #We need a function for Redirection.
         keyList = fetch_key_list(key,state)
+        IO.puts("\nput request recvd at #{whoami()}")
+        IO.inspect(keyList)
         node_eligible = check_eligibility(keyList,whoami())
         if node_eligible == true do
           request = {sender,key,value,context,keyList}
@@ -777,7 +779,7 @@ defmodule Dynamo do
 
 
       {sender, {:get, key}} ->
-        IO.puts("Got Get Request From Client State of Node: #{inspect(state)}")
+        # IO.puts("Got Get Request From Client State of Node: #{inspect(state)}")
         keyList = fetch_key_list(key,state)
         #IO.puts("Returns from here")
         node_eligible = check_eligibility(keyList,whoami())

@@ -1,4 +1,4 @@
-defmodule ClientDynamoTest do
+defmodule StalenessTest do
     use ExUnit.Case
     doctest Dynamo
 

@@ -8,12 +8,9 @@ defmodule ClientDynamoTest do
       except: [spawn: 3, spawn: 1, spawn_link: 1, spawn_link: 3, send: 2]
 
     defp sendPutRequest(proc_name,message,node_name) do
-        IO.puts("here...")
         proc_name = Dynamo.Client.new_client(node_name)
-        IO.puts("there....")
         {key,value,context} = message
         t1 = Emulation.now()
-        IO.puts("t1 : #{t1}")
         {:ok, proc_name} = Dynamo.Client.put(proc_name, key, value, context)
         # IO.inspect(proc_name)
         
@@ -26,16 +23,12 @@ defmodule ClientDynamoTest do
 
     defp sendGetRequest(proc_name,key,node_name) do
         proc_name = Dynamo.Client.new_client(node_name)
-        
+        t1 = Emulation.now()
         {{value,ret_context},_} = Dynamo.Client.get(proc_name,key)
-        IO.inspect(proc_name)
-        IO.puts("GET for contacted node: #{node_name},and key: #{key} done ; [#{key},#{value},#{ret_context}]")
-        # t1 = Emulation.now()
-        # {:ok, proc_name} = Dynamo.Client.put(proc_name, key, value, context)
-        # IO.puts("Write for contacted node: #{node_name}, client_node: #{proc_name} done ; [#{key},#{value},#{context}]")
-        # t2 = Emulation.now()
-        # t = t2 - t1
-        # t = Emulation.emu_to_millis(t)
+        t2 = Emulation.now()
+        t = t2 - t1
+        t = Emulation.emu_to_millis(t)
+        IO.puts("GET for contacted node: #{node_name},and key: #{key} done ; [#{key},#{value},#{ret_context}] time: #{t}")
         #IO.puts("Time Taken for #{inspect(:proc_name)} to get response : #{inspect(t)}")
     end
 
@@ -64,15 +57,34 @@ defmodule ClientDynamoTest do
         spawn(:j, fn -> Dynamo.start_Dynamo(base_config) end)
         receive do
         after
-            1_000 -> :ok
+            5_000 -> :ok
         end
         
         spawn(:c1, fn -> sendPutRequest(:c1,{10,9402,1},:a) end)
-        spawn(:c2, fn -> sendPutRequest(:c2,{10,9402,2},:b) end)
-        spawn(:c3, fn -> sendPutRequest(:c3,{10,9402,3},:c) end)
-        spawn(:c4, fn -> sendPutRequest(:c4,{10,9402,4},:d) end)
-
+        receive do
+        after
+            1_000 -> :ok
+        end
+        spawn(:c2, fn -> sendPutRequest(:c2,{10,23,2},:b) end)
+        receive do
+        after
+            1_000 -> :ok
+        end
+        spawn(:c3, fn -> sendPutRequest(:c3,{10,345,3},:c) end)
+        receive do
+        after
+            1_000 -> :ok
+        end
+        spawn(:c4, fn -> sendPutRequest(:c4,{10,2345,4},:d) end)
+        receive do
+        after
+            1_000 -> :ok
+        end
         spawn(:c5, fn -> sendGetRequest(:c5,10,:f) end)
+        receive do
+            after
+            30000 -> :ok
+        end
     after
         Emulation.terminate()
     end
