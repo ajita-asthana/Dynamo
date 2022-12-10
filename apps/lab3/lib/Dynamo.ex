@@ -515,6 +515,7 @@ defmodule Dynamo do
         context: context,
         success: success
       }} -> 
+        # IO.puts("[dynamo] put response received from #{sender} with success #{success}")
           state = mark_process_alive(state,[sender])
           if success == true do
             listen_to_write_request(state,count - 1,request)
@@ -656,7 +657,7 @@ defmodule Dynamo do
         {sender, %Message.GetRequest{
           key: key
         }} ->  
-        IO.puts("\n1. Read request received at #{whoami()}")
+        # IO.puts("\n1. Read request received at #{whoami()}")
           state = mark_process_alive(state,[sender])
         if state.hash_map[key] == nil do
           message = %Message.GetResponse{
@@ -667,8 +668,8 @@ defmodule Dynamo do
           send(sender,message)
           listen_to_read_request(state,request,response,read_count)
         else 
-          IO.puts("\nRead request received at #{whoami()}")
-          IO.inspect(state.hash_map)
+          # IO.puts("\nRead request received at #{whoami()}")
+          # IO.inspect(state.hash_map)
           {:ok,{val,cont}} = Map.fetch(state.hash_map,key)
           message = %Message.GetResponse{
             key: key,
@@ -763,16 +764,20 @@ defmodule Dynamo do
       {sender, {:put, key, value, context}} ->
         #We need a function for Redirection.
         keyList = fetch_key_list(key,state)
-        IO.puts("\nput request recvd at #{whoami()}")
-        IO.inspect(keyList)
+        # IO.puts("\nput request recvd at #{whoami()}")
+        # IO.inspect(keyList)
         node_eligible = check_eligibility(keyList,whoami())
+        # IO.puts("\nnode eligible: #{node_eligible}")
         if node_eligible == true do
+          # IO.puts("\nis eligible.")
           request = {sender,key,value,context,keyList}
           transition_to_write_mode(state,request)
         else
+          
           [head|tail] = keyList
           message = {:redirect,head}
           send(sender,message)
+          # IO.puts("\n Not  eligible, redirecting to #{head}")
           #IO.puts("Message: #{inspect(message)}")
           listen_client_request(state)
         end
