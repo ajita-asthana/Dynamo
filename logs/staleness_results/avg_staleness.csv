@@ -1,0 +1,4 @@
+configuration,1% drop,2% drop,5% drop,7% drop
+1R_1W,0.01,0.05,0.311
+1R_2W,0.01,0.08,0.11
+2R_1W,0,0,

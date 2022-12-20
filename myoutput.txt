@@ -1,0 +1,59 @@
+==> emulation
+Paths given to "mix test" did not match any directory/file: test/latency_test.exs:204
+==> lab3
+Excluding tags: [:test]
+Including tags: [line: "204"]
+
+Measure Write Latency
+Reached Here
+
+ [c45] PUT: At a return [437,7239,45] TIME : 10 
+
+
+ [c76] PUT: At a return [437,4385,76] TIME : 9 
+
+
+ [c85] PUT: At a return [437,6564,85] TIME : 9 
+
+
+ [c97] PUT: At a return [437,5186,97] TIME : 10 
+
+
+ [c98] PUT: At a return [437,6589,98] TIME : 10 
+
+
+ [c93] PUT: At a return [437,4706,93] TIME : 11 
+
+
+ [c99] PUT: At a return [437,2004,99] TIME : 13 
+
+
+ [c100] PUT: At a return [437,3939,100] TIME : 23 
+
+
+
+  1) test Multiple Read/Write Requests : Measure Write Latency (ClientDynamoTest)
+     apps/lab3/test/latency_test.exs:204
+     ** (ExUnit.TimeoutError) test timed out after 60000ms. You can change the timeout:
+     
+       1. per test by setting "@tag timeout: x" (accepts :infinity)
+       2. per test module by setting "@moduletag timeout: x" (accepts :infinity)
+       3. globally via "ExUnit.start(timeout: x)" configuration
+       4. by running "mix test --timeout x" which sets timeout
+       5. or by running "mix test --trace" which sets timeout to infinity
+          (useful when using IEx.pry/0)
+     
+     where "x" is the timeout given as integer in milliseconds (defaults to 60_000).
+     
+     code: spawn(:c100, fn -> sendPutRequest(:c100,{437,3939,100},:a) end)
+     stacktrace:
+       test/latency_test.exs:333: (test)
+       (ex_unit 1.14.2) lib/ex_unit/runner.ex:512: ExUnit.Runner.exec_test/1
+       (stdlib 4.1.1) timer.erl:235: :timer.tc/1
+       (ex_unit 1.14.2) lib/ex_unit/runner.ex:463: anonymous fn/4 in ExUnit.Runner.spawn_test_monitor/4
+
+
+Finished in 60.1 seconds (0.00s async, 60.1s sync)
+2 tests, 1 failure, 1 excluded
+
+Randomized with seed 127075

@@ -1,0 +1,115 @@
+==> emulation
+Paths given to "mix test" did not match any directory/file: test/staleness_test.exs:42
+==> lab3
+Excluding tags: [:test]
+Including tags: [line: "42"]
+
+TEST START
+
+ [c1]PUT: At a return [478,9402,1]
+
+
+ [c2]PUT: At b return [478,940,2]
+
+[r7] GET: At f return [478,940,2]
+[r8] GET: At j return [478,940,2]
+[r4] GET: At e return [478,940,2]
+[r12] GET: At e return [478,940,2]
+[r10] GET: At b return [478,940,2]
+[r6] GET: At j return [478,940,2]
+[r9] GET: At b return [478,940,2]
+[r3] GET: At h return [478,940,2]
+
+ [c3]PUT: At j return [478,897,3]
+
+[r17] GET: At g return [478,897,3]
+[r20] GET: At e return [478,897,3]
+[r18] GET: At g return [478,897,3]
+[r13] GET: At a return [478,897,3]
+[r19] GET: At e return [478,897,3]
+[r15] GET: At j return [478,897,3]
+[r14] GET: At i return [478,897,3]
+[r21] GET: At a return [478,897,3]
+[r16] GET: At h return [478,897,3]
+[r22] GET: At a return [478,897,3]
+
+ [c4]PUT: At g return [478,100,4]
+
+[r24] GET: At f return [478,100,4]
+[r32] GET: At j return [478,100,4]
+[r26] GET: At j return [478,100,4]
+[r30] GET: At e return [478,100,4]
+[r28] GET: At b return [478,100,4]
+[r31] GET: At i return [478,100,4]
+[r27] GET: At h return [478,100,4]
+
+ [c5]PUT: At f return [478,1100,5]
+
+[r41] GET: At f return [478,100,4]
+[r40] GET: At e return [478,100,4]
+[r39] GET: At e return [478,100,4]
+[r36] GET: At f return [478,100,4]
+[r42] GET: At a return [478,100,4]
+[r34] GET: At b return [478,100,4]
+[r37] GET: At j return [478,100,4]
+[r33] GET: At b return [478,100,4]
+[r38] GET: At b return [478,100,4]
+
+ [c6]PUT: At i return [478,3456,6]
+
+[r43] GET: At f return [478,3456,6]
+[r49] GET: At e return [478,3456,6]
+[r46] GET: At e return [478,3456,6]
+[r48] GET: At e return [478,3456,6]
+[r47] GET: At d return [478,3456,6]
+[r51] GET: At h return [478,3456,6]
+[r44] GET: At i return [478,3456,6]
+[r52] GET: At h return [478,3456,6]
+
+ [c7]PUT: At f return [478,721,7]
+
+[r58] GET: At g return [478,721,7]
+[r61] GET: At e return [478,721,7]
+[r54] GET: At e return [478,721,7]
+[r57] GET: At a return [478,721,7]
+[r53] GET: At b return [478,721,7]
+[r62] GET: At d return [478,721,7]
+[r56] GET: At a return [478,721,7]
+
+ [c8]PUT: At c return [478,657,8]
+
+[r63] GET: At f return [478,657,8]
+[r71] GET: At e return [478,657,8]
+[r72] GET: At j return [478,657,8]
+[r66] GET: At d return [478,657,8]
+[r64] GET: At f return [478,657,8]
+[r70] GET: At c return [478,657,8]
+[r68] GET: At i return [478,657,8]
+
+ [c9]PUT: At j return [478,356,9]
+
+[r77] GET: At f return [478,356,9]
+[r73] GET: At g return [478,356,9]
+[r74] GET: At g return [478,356,9]
+[r80] GET: At h return [478,356,9]
+[r75] GET: At h return [478,356,9]
+[r78] GET: At j return [478,356,9]
+[r79] GET: At b return [478,356,9]
+[r76] GET: At i return [478,356,9]
+[r82] GET: At d return [478,356,9]
+
+ [c8]PUT: At e return [478,454,10]
+
+[r91] GET: At e return [478,454,10]
+[r83] GET: At e return [478,454,10]
+[r89] GET: At g return [478,454,10]
+[r90] GET: At j return [478,454,10]
+[r87] GET: At i return [478,454,10]
+[r86] GET: At i return [478,454,10]
+[r92] GET: At e return [478,454,10]
+[r88] GET: At b return [478,454,10]
+.
+Finished in 49.1 seconds (0.00s async, 49.1s sync)
+1 test, 0 failures
+
+Randomized with seed 560855

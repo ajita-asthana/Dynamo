@@ -1,0 +1,6 @@
+==> lab3
+Compiling 1 file (.ex)
+
+== Compilation error in file lib/Dynamo.ex ==
+** (CompileError) lib/Dynamo.ex:815: undefined function _MODULE_/0 (there is no such import)
+
