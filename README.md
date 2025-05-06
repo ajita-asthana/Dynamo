@@ -1,2 +1,41 @@
-DynamoDB is a highly available, fully managed, key-value NoSQL database. It is known for its ’always-on’ experience and single-digit millisecond performance at any scale. Based on [1], we examine CAP theorem consequences of offering availability, handling network partitions with a weaker consistency model. We referenced [2] for detailed implementation.
-We examine the effects of consistent hashing, sloppy and strict quorums in our design. Process failures are handled assuming a fail-stop model (a failed pro- cess never rejoins the cluster, therefore no need of hinted handoff mechanism). View reconciliation in the scenario of multiple node failures (Nodes/processes redistribute key ranges ownership to maintain N -> the replication factor) are tested as well.
+# Dynamo
+
+Implement a weakly consistent key-value store and measure the impact of weak consistency.
+
+## Table of Contents
+- [Introduction](#introduction)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Introduction
+Dynamo is a project to implement a weakly consistent key-value store and measure the impact of weak consistency.
+
+## Features
+- Weak consistency implementation
+- Key-value store functionality
+- Performance measurement tools
+
+## Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/ajita-asthana/Dynamo.git
+
+## Navigate into the directory:
+```cd Dynamo```
+
+## Usage
+TO-DO
+
+##  Examples
+
+## Contributing
+Contributions are welcome! Please read the CONTRIBUTING.md for guidelines.
+
+## License
+This project is licensed under the MIT License.
+
+
